@@ -30,7 +30,7 @@ Here are some quick facts about our main ProLong model: [princeton-nlp/Llama-3-8
 </p>
 
 <p align="center">
-<em>ProLong performance on <a href="https://github.com/princeton-nlp/helmet">HELMET</a> averaged over 32K, 64K, and 128K lengths. All models evaluated are instruct models.</em>
+<em>ProLong performance on <a href="https://github.com/princeton-nlp/helmet">HELMET</a> averaged over 32K, 64K, and 128K lengths. All models are instruct models.</em>
 </p>
 
 
