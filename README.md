@@ -24,14 +24,19 @@ Here are some quick facts about our main ProLong model: [princeton-nlp/Llama-3-8
 * Supervised fine-tuning (SFT): [UltraChat](https://huggingface.co/datasets/HuggingFaceH4/ultrachat_200k)
 * Maximum context window: 512K tokens
 
-<img width="1538" alt="image" src="https://github.com/user-attachments/assets/a36a7d0f-4480-4a29-80f3-208477707fb7">
 
-<img width="1888" alt="image" src="https://github.com/user-attachments/assets/c31c9671-49fe-4776-91d2-de70ffd9f9a1">
+<p align="center">
+  <img width="80%" alt="image" src="https://github.com/user-attachments/assets/c31c9671-49fe-4776-91d2-de70ffd9f9a1">
+</p>
+
+<p align="center">
+<em>ProLong performance on <a href="https://github.com/princeton-nlp/helmet">HELMET</a> averaged over 32K, 64K, and 128K lengths. All models evaluated are instruct models.</em>
+</p>
 
 
 ## Download the models and data
 
-All ProLong models are available on Hugging Face.
+All ProLong models are available on Hugging Face. All the models are based on Llama-3-8B, so any code that supports Llama-3-8B is also compatible with ProLong models.
 
 | Model | HF Link |
 |-------|---------|
@@ -48,7 +53,18 @@ Our training data are also available on Hugging Face.
 | Stage 2: 512K training data | [princeton-nlp/prolong-data-512K](https://huggingface.co/datasets/princeton-nlp/prolong-data-512K) |
 
 
+## How to train ProLong
 
+<p align="center">
+  <img width="80%" alt="image" src="https://github.com/user-attachments/assets/a36a7d0f-4480-4a29-80f3-208477707fb7">
+</p>
+<p align="center">
+<em>ProLong training recipe</em>
+</p>
+
+
+
+Coming soon!
 
 ## Citation
 
