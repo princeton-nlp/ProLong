@@ -61,7 +61,7 @@ Our training data are also available on Hugging Face.
   <img width="80%" alt="image" src="https://github.com/user-attachments/assets/a36a7d0f-4480-4a29-80f3-208477707fb7">
 </p>
 <p align="center">
-<em>ProLong training recipe</em>
+<em>ProLong training recipe.</em>
 </p>
 
 
