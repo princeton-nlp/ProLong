@@ -8,6 +8,7 @@ ProLong is a family of long-context models that are continued trained and superv
 
 To train this strong long-context model, we conduct thorough ablations on the long-context pre-training data, SFT data, and numerous other design choices. We demonstrate our findings in our paper, [How to Train Long-Context Language Models (Effectively)]().
 
+Authors: [Tianyu Gao](https://gaotianyu.xyz/about)*, [Alexander Wettig](https://www.cs.princeton.edu/~awettig/)*, [Howard Yen](https://howard-yen.github.io/), [Danqi Chen](https://www.cs.princeton.edu/~danqic/) (* equal contribution)
 
 ## Release Progress
 
@@ -65,6 +66,11 @@ Our training data are also available on Hugging Face.
 
 
 Coming soon!
+
+## Contact
+
+Please email Tianyu (`tianyug@princeton.edu`) or Alex (`awettig@princeton.edu`) if you have any questions. If you encounter any issues with the code, models, or data, please open an issue on GitHub.
+
 
 ## Citation
 
