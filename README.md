@@ -24,6 +24,11 @@ Here are some quick facts about our main ProLong model: [princeton-nlp/Llama-3-8
 * Supervised fine-tuning (SFT): [UltraChat](https://huggingface.co/datasets/HuggingFaceH4/ultrachat_200k)
 * Maximum context window: 512K tokens
 
+<img width="1538" alt="image" src="https://github.com/user-attachments/assets/a36a7d0f-4480-4a29-80f3-208477707fb7">
+
+<img width="1888" alt="image" src="https://github.com/user-attachments/assets/c31c9671-49fe-4776-91d2-de70ffd9f9a1">
+
+
 ## Download the models and data
 
 All ProLong models are available on Hugging Face.
