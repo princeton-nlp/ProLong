@@ -88,13 +88,11 @@ More raw data will be released soon!
 Full documentation and installation guide can be found [here](https://docs.mosaicml.com/projects/streaming/en/stable/index.html).
 
 <pre>
-<code lang="python">
->>> from streaming import LocalDataset
+<code class="language-python">>>> from streaming import LocalDataset
 >>> dataset = LocalDataset("path/to/dataset")
 >>> len(dataset) # number of samples
 >>> dataset[0] # allow random access, use like a dictionary/JSON
-{'domain': 'book', 'input_ids': array([ 1038, 19017,  2041, ...,   271, 12488,   220], dtype=uint32), 'length': 111200}
-</code>
+{'domain': 'book', 'input_ids': array([ 1038, 19017,  2041, ...,   271, 12488,   220], dtype=uint32), 'length': 111200}</code>
 </pre>
 
 </details>
