@@ -70,7 +70,7 @@ pip install awscli
 aws configure
 
 # Download the raw code repo data (concatenated by repo names from the stack v1) 
-aws s3 sync s3://princeton-prolong/data_before_packing/code_repos/ --request-payer requester
+aws s3 sync s3://princeton-prolong/data_before_packing/code_repos/ /target/path/ --request-payer requester
 ```
 
 Below is the available unpacked raw data (tokenized with the Llama-3 tokenizer). All data is in the [mosaicml-streaming](https://docs.mosaicml.com/projects/streaming/en/stable/index.html) format, with three fields: `domain` (`str`), `input_ids` (`int32 numpy array`, the Llama-3 tokenized document with no BOS/EOS), and `length` (`int32`, number of tokens).
