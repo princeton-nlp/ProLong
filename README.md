@@ -36,7 +36,7 @@ Here are some quick facts about our main ProLong model: [princeton-nlp/Llama-3-8
 </p>
 
 
-## Download the models and data
+## Download the models and packed data
 
 All ProLong models are available on Hugging Face. All the models are based on Llama-3-8B, so any code that supports Llama-3-8B is also compatible with ProLong models.
 
@@ -47,13 +47,63 @@ All ProLong models are available on Hugging Face. All the models are based on Ll
 | ProLong-512k-Base | [princeton-nlp/Llama-3-8B-ProLong-512k-Base](https://huggingface.co/princeton-nlp/Llama-3-8B-ProLong-512k-Base) |
 | ⭐ ProLong-512k-Instruct | [princeton-nlp/Llama-3-8B-ProLong-512k-Instruct](https://huggingface.co/princeton-nlp/Llama-3-8B-ProLong-512k-Instruct)  |
 
-Our training data are also available on Hugging Face.
+Our training data (packed and sampled version) are also available on Hugging Face (in [mosaicml-streaming](https://docs.mosaicml.com/projects/streaming/en/stable/index.html) format).
 
 | Data | HF Link |
 |------|---------|
-| Stage 1: 64K training data | [princeton-nlp/prolong-data-64K](https://huggingface.co/datasets/princeton-nlp/prolong-data-64K) |
-| Stage 2: 512K training data | [princeton-nlp/prolong-data-512K](https://huggingface.co/datasets/princeton-nlp/prolong-data-512K) |
+| Stage 1: 64K training data (40B tokens) | [princeton-nlp/prolong-data-64K](https://huggingface.co/datasets/princeton-nlp/prolong-data-64K) |
+| Stage 2: 512K training data (40B tokens)| [princeton-nlp/prolong-data-512K](https://huggingface.co/datasets/princeton-nlp/prolong-data-512K) |
 
+
+
+## Download and prepare raw data
+
+If you want to experiment with different data lengths or data mixtures,
+We also provide the (unpacked, unfiltered, but tokenized) raw data from each domain below. 
+Due to the large size of the raw data, we store it on AWS S3. To download the data, you need to have an AWS account (with an access key and a secret key). **Note that data downloading will incur a charge on your AWS account**. According to [this S3 document](https://aws.amazon.com/s3/pricing/), each GB of data downloaded incurs $0.09 and the first 100GB is free. You can download the data using the following commands:
+
+```bash
+# Install AWS CLI if you haven't already
+pip install awscli
+
+# Configure AWS CLI with your credentials (you will need an access key and a secret key from your AWS account)
+aws configure
+
+# Download the raw code repo data (concatenated by repo names from the stack v1) 
+aws s3 sync s3://princeton-prolong/data_before_packing/code_repos/ --request-payer requester
+```
+
+Below is the available unpacked raw data (tokenized with the Llama-3 tokenizer). All data is in the [mosaicml-streaming](https://docs.mosaicml.com/projects/streaming/en/stable/index.html) format, with three fields: `domain` (`str`), `input_ids` (`int32 numpy array`, the Llama-3 tokenized document with no BOS/EOS), and `length` (`int32`, number of tokens).
+
+| Data | Size | S3 path |
+|------|------|---------|
+| Code repos | 689 GB | s3://princeton-prolong/data_before_packing/code_repos/ |
+| Books | 180 GB| s3://princeton-prolong/data_before_packing/books/ |
+
+More raw data will be released soon!
+
+<details>
+<summary>A quick guide of mosaicml-streaming</summary>
+
+Full documentation and installation guide can be found [here](https://docs.mosaicml.com/projects/streaming/en/stable/index.html).
+
+<pre>
+<code lang="python">
+>>> from streaming import LocalDataset
+>>> dataset = LocalDataset("path/to/dataset")
+>>> len(dataset) # number of samples
+>>> dataset[0] # allow random access, use like a dictionary/JSON
+{'domain': 'book', 'input_ids': array([ 1038, 19017,  2041, ...,   271, 12488,   220], dtype=uint32), 'length': 111200}
+</code>
+</pre>
+
+</details>
+
+
+
+### How to filter and pack data
+
+We use our own [datatools](https://github.com/CodeCreator/datatools) (created by Alex and Tianyu) to filter (by lengths) and pack data. `datatools` is a versatile repo that supports tokenization/packing/filtering from various raw formats (json, jsonl, hugging face, mosaicml-streaming, etc) and outputs the data in the mosaicml-streaming format.
 
 ## How to train ProLong
 
