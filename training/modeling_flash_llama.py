@@ -36,6 +36,8 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import logging
 from transformers.models.llama.configuration_llama import LlamaConfig
 
+from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS
+
 from flash_attn import flash_attn_kvpacked_func, flash_attn_varlen_kvpacked_func, flash_attn_with_kvcache
 from flash_attn.bert_padding import unpad_input, pad_input
 
@@ -75,6 +77,7 @@ class LlamaRMSNorm(nn.Module):
 
 
 class FlashRotaryEmbedding(torch.nn.Module):
+    #NOTE: Unused now that we have switched to the LlamaRotaryEmbedding class
     """
     The rotary position embeddings from RoFormer_ (Su et. al).
     A crucial insight from the method is that the query and keys are
@@ -176,10 +179,12 @@ class FlashRotaryEmbedding(torch.nn.Module):
                 self._cos_k_cached = (torch.cos(freqs) / scale).to(dtype)
                 self._sin_k_cached = (torch.sin(freqs) / scale).to(dtype)
 
-    def forward(self,
-                q: torch.Tensor, k: torch.Tensor,
-                seqlen_offset: int = 0,
-                unpadded_lengths: Optional[Tuple[torch.Tensor]] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        q: torch.Tensor, k: torch.Tensor,
+        seqlen_offset: int = 0,
+        unpadded_lengths: Optional[Tuple[torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         q: (batch, seqlen, nheads, headdim)
         k: (batch, seqlen, nheads, headdim)
@@ -205,6 +210,116 @@ class FlashRotaryEmbedding(torch.nn.Module):
         else:
             assert False
 
+class LlamaRotaryEmbedding(nn.Module):
+    def __init__(
+        self,
+        dim=None,
+        max_position_embeddings=2048,
+        base=10000,
+        device=None,
+        scaling_factor=1.0,
+        rope_type="default",
+        interleaved=False,
+        config: Optional[LlamaConfig] = None,
+    ):
+        super().__init__()
+        self.rope_kwargs = {}
+        self.scaling_factor = scaling_factor
+        self.interleaved = interleaved
+        
+        if config is None:
+            logger.warning_once(
+                "`L3lamaRotaryEmbedding` can now be fully parameterized by passing the model config through the "
+                "`config` argument. All other arguments will be removed in v4.46"
+            )
+            self.rope_kwargs = {
+                "rope_type": rope_type,
+                "factor": scaling_factor,
+                "dim": dim,
+                "base": base,
+                "max_position_embeddings": max_position_embeddings,
+            }
+            self.rope_type = rope_type
+            self.max_seq_len_cached = max_position_embeddings
+            self.original_max_seq_len = max_position_embeddings
+        else:
+            # BC: "rope_type" was originally "type"
+            if config.rope_scaling is not None:
+                self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
+            else:
+                self.rope_type = "default"
+            self.max_seq_len_cached = config.max_position_embeddings
+            self.original_max_seq_len = config.max_position_embeddings
+
+        self.config = config
+        self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
+
+        inv_freq, self.attention_scaling = self.rope_init_fn(self.config, device, **self.rope_kwargs)
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        self.original_inv_freq = self.inv_freq
+
+    def _dynamic_frequency_update(self, seq_len, device):
+        """
+        dynamic RoPE layers should recompute `inv_freq` in the following situations:
+        1 - growing beyond the cached sequence length (allow scaling)
+        2 - the current sequence length is in the original scale (avoid losing precision with small sequences)
+        """
+        seq_len = torch.max(position_ids) + 1
+        if seq_len > self.max_seq_len_cached:  # growth
+            inv_freq, self.attention_scaling = self.rope_init_fn(
+                self.config, device, seq_len=seq_len, **self.rope_kwargs
+            )
+            self.register_buffer("inv_freq", inv_freq, persistent=False)  # TODO joao: may break with compilation
+            self.max_seq_len_cached = seq_len
+
+        if seq_len < self.original_max_seq_len and self.max_seq_len_cached > self.original_max_seq_len:  # reset
+            self.register_buffer("inv_freq", self.original_inv_freq, persistent=False)
+            self.max_seq_len_cached = self.original_max_seq_len
+
+    def forward(
+        self, 
+        q: torch.Tensor, k: torch.Tensor,
+        seqlen_offset: int = 0,
+        unpadded_lengths: Optional[Tuple[torch.Tensor]] = None
+    ):
+        with torch.no_grad():
+            if unpadded_lengths is not None:
+                cu_seqlens, max_seqlen = unpadded_lengths
+            else:
+                cu_seqlens, max_seqlen = None, q.shape[1]
+            seq_len = max_seqlen + seqlen_offset
+            if "dynamic" in self.rope_type:
+                self._dynamic_frequency_update(seq_len, device=x.device)
+
+            # Core RoPE block
+            inv_freq = self.inv_freq
+            t = torch.arange(seq_len, device=q.device, dtype=torch.float32)
+            t /= self.scaling_factor
+            
+            # Force float32 (see https://github.com/huggingface/transformers/pull/29285)
+            device_type = q.device.type
+            device_type = device_type if isinstance(device_type, str) and device_type != "mps" else "cpu"
+            with torch.autocast(device_type=device_type, enabled=False):
+                freqs = torch.outer(t, inv_freq)
+                cos = freqs.cos()
+                sin = freqs.sin()
+
+            # Advanced RoPE types (e.g. yarn) apply a post-processing scaling factor, equivalent to scaling attention
+            cos = cos * self.attention_scaling
+            sin = sin * self.attention_scaling
+            
+            cos = cos.to(dtype=q.dtype)
+            sin = sin.to(dtype=q.dtype)
+
+        return apply_rotary_emb_func(
+            q, cos[seqlen_offset:], sin[seqlen_offset:],
+            self.interleaved, True, # inplace=True,
+            cu_seqlens=cu_seqlens, max_seqlen=max_seqlen
+        ), apply_rotary_emb_func(
+            k, cos[seqlen_offset:], sin[seqlen_offset:],
+            self.interleaved, True, # inplace=True
+            cu_seqlens=cu_seqlens, max_seqlen=max_seqlen
+        )
 
 class LlamaMLP(nn.Module):
     def __init__(self, config):
@@ -234,7 +349,15 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
 class LlamaAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig):
+    def __init__(
+        self, 
+        config: LlamaConfig,
+        layer_idx: Optional[int] = None,
+        context_window_toggle: Optional[int] = 4096,
+    ):
+        """
+        @context_window_toggle: if not None, the attention will be limited to a context window specified by this value
+        """
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -258,18 +381,8 @@ class LlamaAttention(nn.Module):
             "norm_factor",
             torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32)).to(torch.get_default_dtype()),
             persistent=False,
-        )
-
-        if not getattr(self.config, "rope_scaling", None):
-            scaling_factor = 1
-        else:
-            scaling_type = self.config.rope_scaling["type"]
-            scaling_factor = self.config.rope_scaling["factor"]
-            assert scaling_type == 'linear'
-        theta = getattr(self.config, "rope_theta", 10000)
-        self.rotary_emb = FlashRotaryEmbedding(
-            self.head_dim, base=theta, interleaved=False, scaling_factor=scaling_factor,
-        )
+        )        
+        self.rotary_emb = LlamaRotaryEmbedding(config=self.config)
 
         self.distributed_attn_func = DistributedAttention(flash_attn_kvpacked_func, gather_idx=1)
         self.distributed_varlen_attn_func = DistributedAttention(flash_attn_varlen_kvpacked_func, gather_idx=0)
@@ -288,8 +401,10 @@ class LlamaAttention(nn.Module):
         use_cache: bool = False,
         unpadded_lengths: Optional[Tuple[torch.Tensor]] = None,
         seq_parallel_group: Optional[Any] = None,
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
-        h_size = hidden_states.size(-1)
+        q_len, h_size = hidden_states.size(-2), hidden_states.size(-1)
 
         has_layer_past = past_key_value is not None
 
@@ -303,20 +418,32 @@ class LlamaAttention(nn.Module):
         if position_ids is not None:
             past_len += position_ids.min()
 
-        q = self.q_proj(hidden_states)
-        k = self.k_proj(hidden_states)
-        v = self.v_proj(hidden_states)
+        if self.config.pretraining_tp > 1:
+            key_value_slicing = (self.num_key_value_heads * self.head_dim) // self.config.pretraining_tp
+            query_slices = self.q_proj.weight.split(
+                (self.num_heads * self.head_dim) // self.config.pretraining_tp, dim=0
+            )
+            key_slices = self.k_proj.weight.split(key_value_slicing, dim=0)
+            value_slices = self.v_proj.weight.split(key_value_slicing, dim=0)
+
+            q = [F.linear(hidden_states, query_slices[i]) for i in range(self.config.pretraining_tp)]
+            q = torch.cat(q, dim=-1)
+
+            k = [F.linear(hidden_states, key_slices[i]) for i in range(self.config.pretraining_tp)]
+            k = torch.cat(k, dim=-1)
+
+            v = [F.linear(hidden_states, value_slices[i]) for i in range(self.config.pretraining_tp)]
+            v = torch.cat(v, dim=-1)
+        else:
+            q = self.q_proj(hidden_states)
+            k = self.k_proj(hidden_states)
+            v = self.v_proj(hidden_states)
 
         q = q.view(*q.shape[:-1], self.num_heads, self.head_dim)
         k = k.view(*k.shape[:-1], self.num_key_value_heads, self.head_dim)
         v = v.view(*v.shape[:-1], self.num_key_value_heads, self.head_dim)
 
-        if unpadded_lengths is not None:
-            # relative stays relative
-            q, k = self.rotary_emb(q.unsqueeze(0), k.unsqueeze(0), past_len)
-            q, k = q.squeeze(0), k.squeeze(0)
-        else:
-            q, k = self.rotary_emb(q, k, past_len)
+        q, k = self.rotary_emb(q, k, past_len, unpadded_lengths)
 
         kv = torch.stack([k, v], -3)
         kv = repeat_kv(kv, self.num_key_value_groups)
@@ -926,3 +1053,4 @@ class LlamaForSequenceClassification(LlamaPreTrainedModel):
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
+
