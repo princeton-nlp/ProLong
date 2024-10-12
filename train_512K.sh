@@ -31,7 +31,7 @@ domains_name=ProLong512KMix
 
 bsz=${BSZ:-128} # * 512K (seq len) / 8 (seq parallel size) = 8M
 seq=${SEQ:-1}
-lr=${LR:-1e-5}
+lr=${LR:-5e-6}
 steps=${STEPS:-2500}
 save_steps=${SAVE:-125}
 warmup=${WARMUP:-0.1}
