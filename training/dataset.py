@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 class DataArguments:
     single_seq: bool = field(default=False, metadata={"help": "Override the length of the input"})
     subsplit_length: Optional[int] = field(default=None, metadata={"help": "Split sequences into small lengths"})
-    per_device_varlen_padding: Optional[int] = field(default=4_294_967_296, metadata={"help": "Excess tokens for variable length attention"})
     per_device_max_tokens: Optional[int] = field(default=4_294_967_296, metadata={"help": "Maximum number of tokens per device"})
 
 
@@ -84,23 +83,6 @@ class DataCollator:
 
         input_ids = torch.concat(input_ids, dim=0)
         labels = torch.concat(labels, dim=0)
-
-        num_docs = len(seq_lengths)
-        num_tokens = sum(seq_lengths)  # technically rounded by 128 by flashattn kernel
-        if num_docs > (self.args.per_device_varlen_padding + num_tokens) // max(seq_lengths):
-            padding = max(seq_lengths) * num_docs - num_tokens
-
-            while len(seq_lengths) > (self.args.per_device_varlen_padding + sum(seq_lengths)) // max(seq_lengths):
-                seq_lengths = seq_lengths[:-1]
-
-            new_num_tokens = sum(seq_lengths)
-            new_num_docs = len(seq_lengths)
-
-            logger.warn(f"Batch varlen padding ({padding}) exceeds threshold ({self.args.per_device_varlen_padding})")
-            logger.warn(f"Reduced {num_docs} documents ({num_tokens} tokens) to {new_num_docs} documents ({new_num_tokens} tokens)")
-
-            input_ids = input_ids[:new_num_tokens]
-            labels = labels[:new_num_tokens]
 
         seq_lengths = torch.tensor(seq_lengths, dtype=torch.long)
 
