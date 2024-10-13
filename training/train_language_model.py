@@ -230,6 +230,10 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
+        if torch.distributed.is_initialized():
+            torch.distributed.barrier()
+
+
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
