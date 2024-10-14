@@ -125,8 +125,9 @@ Please email Tianyu (`tianyug@princeton.edu`) or Alex (`awettig@princeton.edu`) 
 
 ```bibtex
 @article{gao2024prolong,
-    title={Enabling Large Language Models to Generate Text with Citations},
-    author={Gao, Tianyu and Wettig, Alexander and Yen, Howard and Chen, Danqi},
-    year={2024},
+  title={How to Train Long-Context Language Models (Effectively)},
+  author={Gao, Tianyu and Wettig, Alexander and Yen, Howard and Chen, Danqi},
+  journal={arXiv preprint arXiv:2410.02660},
+  year={2024}
 }
 ```
