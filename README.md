@@ -79,8 +79,14 @@ Below is the available unpacked raw data (tokenized with the Llama-3 tokenizer).
 |------|------|---------|
 | Code repos | 689 GB | s3://princeton-prolong/data_before_packing/code_repos/ |
 | Books | 180 GB| s3://princeton-prolong/data_before_packing/books/ |
+| FineWeb (sampled) | 864 GB | s3://princeton-prolong/data_before_packing/fineweb-2023-50/ |
+| FineWeb-edu (sampled) | 365 GB | s3://princeton-prolong/data_before_packing/fineweb-edu-100B/ |
+| OpenWebMath | 48 GB| s3://princeton-prolong/data_before_packing/openwebmath/ |
+| Wikipedia (Dolma) | 14 GB | s3://princeton-prolong/data_before_packing/wikipedia/ |
+| Textbooks | 1 GB | s3://princeton-prolong/data_before_packing/textbooks/ |
+| Tulu-v2 | 1 GB | s3://princeton-prolong/data_before_packing/tuluv2/ |
 
-More raw data will be released soon!
+More raw data (StackExchange, Arxiv) will be released soon!
 
 <details>
 <summary>A quick guide of mosaicml-streaming</summary>
