@@ -89,6 +89,8 @@ class ScriptArguments:
     tokenized_mds_validation: List[str] = field(default_factory=list, metadata={"help": "Paths to tokenized validation datasets in MDS format"})
     tokenized_mds_test: List[str] = field(default_factory=list, metadata={"help": "Paths to tokenized test datasets in MDS format"})
 
+    token_scaled_loss: bool = field(default=False, metadata={"help": "Whether to re-scale the loss by the number of valid training tokens instead of averaging loss across sequences and devices. This should be turned on for instruction tuning, especially when using synthetic data, as the valid training tokens vary across devices."})
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -177,6 +179,9 @@ def main():
     import streaming
     streaming.base.util.clean_stale_shared_memory()
 
+    if script_args.token_scaled_loss:
+        model.token_scaled_loss = True
+        training_args.token_scaled_loss = True
 
     # load_datasets
     if training_args.do_train:

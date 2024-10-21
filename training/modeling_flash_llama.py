@@ -615,10 +615,11 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         logits = self.lm_head(hidden_states)
         if len(logits.shape) > 2:
             logits = logits.transpose(-1, -2)
+        # For num-valid-token-scaled loss, we sum up here and later reweight in `compute_loss` in the trainer
         return F.cross_entropy(
             logits, labels,
             ignore_index=-100,
-            reduction=("none" if token_losses else "mean")
+            reduction=("sum" if getattr(self, "token_scaled_loss", False) else "mean")
         )
 
     def forward(
@@ -720,19 +721,28 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             hidden_states = pad_input(hidden_states, unpad_indices, bsz, max_seqlen)
 
         if labels is not None or shifted_labels is not None:
-            if not return_token_losses:
-                if shifted_labels is not None:
-                    labels = shifted_labels.reshape(-1)
-                    hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+            if shifted_labels is not None:
+                labels = shifted_labels.reshape(-1)
+                hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
+            else:
+                labels = labels[..., 1:].reshape(-1)
+                hidden_states = hidden_states[..., :-1 ,:].reshape(-1, hidden_states.size(-1))
+
+            if self.logit_block_size > 0:
+                num_valid_labels = (labels != -100).sum()
+                hidden_states = torch.split(hidden_states, self.logit_block_size, dim=0)
+                labels = torch.split(labels, self.logit_block_size, dim=0)
+
+                if getattr(self, "token_scaled_loss", False):
+                    # Just calculate the sum of loss here; we will divide by valid #tokens later in the trainer
+                    loss = sum(
+                        torch.utils.checkpoint.checkpoint(self.compute_loss,
+                                                          hidden_state_block,
+                                                          label_block,
+                                                          use_reentrant=False)
+                        for hidden_state_block, label_block in zip(hidden_states, labels)
+                    )
                 else:
-                    labels = labels[..., 1:].reshape(-1)
-                    hidden_states = hidden_states[..., :-1 ,:].reshape(-1, hidden_states.size(-1))
-
-                if self.logit_block_size > 0:
-                    num_valid_labels = (labels != -100).sum()
-                    hidden_states = torch.split(hidden_states, self.logit_block_size, dim=0)
-                    labels = torch.split(labels, self.logit_block_size, dim=0)
-
                     loss = sum(
                         ((label_block != -100).sum() / num_valid_labels) *
                         torch.utils.checkpoint.checkpoint(self.compute_loss,
@@ -741,26 +751,10 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                                                           use_reentrant=False)
                         for hidden_state_block, label_block in zip(hidden_states, labels)
                     )
-                else:
-                    loss = self.compute_loss(hidden_states, labels)
+
             else:
-                assert shifted_labels is None, "shifted_labels is not supported with `return_token_losses`"
-
-                labels = labels[..., 1:]
-                hidden_states = hidden_states[..., :-1 ,:]
-
-                if self.logit_block_size > 0:
-                    hidden_states = torch.split(hidden_states, self.logit_block_size, dim=-2)
-                    labels = torch.split(labels, self.logit_block_size, dim=-1)
-
-                    loss = torch.cat([
-                        self.compute_loss(hidden_state_block, label_block, token_losses=True)
-                        for hidden_state_block, label_block in zip(hidden_states, labels)
-                    ], dim=-1)
-                else:
-                    loss = self.compute_loss(hidden_states, labels, token_losses=True)
-
-            logits = None  # We don't return logits when computing loss!
+                loss = self.compute_loss(hidden_states, labels)            
+            logits = None
         else:
             logits = self.lm_head(hidden_states)
             loss = None

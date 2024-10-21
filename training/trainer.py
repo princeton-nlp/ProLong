@@ -351,6 +351,25 @@ class Trainer(HFTrainer):
 
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
+        if getattr(self.args, "token_scaled_loss", False):
+            # We are going to scale the loss by the ratio of #valid tokens / avg #valid tokens per device
+            # The standard loss = sum(avg loss of current seq) / #devices / #ga
+            # What we are doing = sum(sum loss of current seq) / avg #valid tokens per device / #devices / #ga = original * (current device valid seq tokens / avg device valid seq tokens) = original_sumreduction (done in `compute_loss` in modeling_flash_llama.py) / avg device valid seq tokens
+            # Technically we should use the avg #valid tokens per device for this batch (may include multiple steps because of gradient accumulation). But for simplicity we use the moving average (from the whole training process)
+
+            device_num_valid_tokens = (inputs["labels"] != -100).sum().float() # Should be on the device already
+            avg_device_num_valid_tokens = torch.mean(self.accelerator.gather(device_num_valid_tokens)).item()
+
+            if not hasattr(self.state, "count_step_for_num_valid_tokens"):
+                self.state.count_step_for_num_valid_tokens = 1
+                self.state.avg_num_valid_tokens_per_device = avg_device_num_valid_tokens
+            else:
+                self.state.count_step_for_num_valid_tokens += 1
+                steps = self.state.count_step_for_num_valid_tokens 
+                self.state.avg_num_valid_tokens_per_device = self.state.avg_num_valid_tokens_per_device * ((steps - 1) / steps) + avg_device_num_valid_tokens / steps # moving avg
+
+            loss = loss / self.state.avg_num_valid_tokens_per_device
+
         if return_output_and_metrics:
             # shifted_labels = inputs["labels"][:,1:].contiguous()
             # valid_mask = (shifted_labels != -100)
