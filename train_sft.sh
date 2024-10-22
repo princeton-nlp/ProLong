@@ -6,6 +6,9 @@
 #SBATCH --mem=400G
 #SBATCH -c 32
 
+# !!!! Load your own environment here !!!! #
+# !!!! Load your own environment here !!!! #
+
 # Fine-tune from this model 
 model=${MODEL:-princeton-nlp/Llama-3-8B-ProLong-512k-Base}
 # Point to the base dir of the ProLong 64K data
@@ -19,12 +22,12 @@ domains_name=ultrachat
 
 
 bsz=${BSZ:-64} # * 64k (seq len) = 4M
-seq=${SEQ:-1}
+seq=${SEQ:-1} # per-device batch size
 lr=${LR:-2e-5}
 steps=${STEPS:-250}
 save_steps=${SAVE:-250}
 warmup=${WARMUP:-0.05}
-suffix=${SUFFIX:-""}
+suffix=${SUFFIX:-""} # for model saving name
 
 
 run_name="sft_$(basename $model)_$(basename $dataset)_${domains_name}_bsz${bsz}_steps${steps}_lr${lr}_warmup${warmup}${suffix}"
@@ -117,7 +120,6 @@ base_arguments=(
     --warmup_ratio $warmup
     --optim adamw_torch
 
-    --cache_dir .cache
     --logging_steps 1
     --log_level info
 

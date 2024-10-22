@@ -53,6 +53,8 @@ Our training data (packed and sampled version) are also available on Hugging Fac
 |------|---------|
 | Stage 1: 64K training data (40B tokens) | [princeton-nlp/prolong-data-64K](https://huggingface.co/datasets/princeton-nlp/prolong-data-64K) |
 | Stage 2: 512K training data (40B tokens)| [princeton-nlp/prolong-data-512K](https://huggingface.co/datasets/princeton-nlp/prolong-data-512K) |
+| SFT: UltraChat (1B tokens) | [princeton-nlp/prolong-ultrachat-64K](https://huggingface.co/datasets/princeton-nlp/prolong-ultrachat-64K) |
+
 
 
 
@@ -120,8 +122,53 @@ We use our own [datatools](https://github.com/CodeCreator/datatools) (created by
 </p>
 
 
+Our training code is built on top of Hugging Face's [Transformers](https://github.com/huggingface/transformers). Compared to the original codebase, we make the following changes:
 
-Coming soon!
+* Support `mosaicml-streaming` formats for datasets (much faster and IO friendly).
+* Support FlashAttention-2's variable-length attention (for efficient document masking). We implemented an in-batch length-sorting dataloader that balances data loads on different devices and improves training throughput.
+* Support sequence parallelism (inspired by DeepSpeed Ulysses).
+* Support SFT (masking out instructions) and token-averaged losses (instead of torch's standard sequence-and-device-averaged losses).
+* We implemented a memory-efficient cross entropy  that allows 64K-token training of Llama-3-8B without using sequence parallelism.
+* Various improvements on checkpoint resuming and logging.
+
+#### File structures
+
+All our code is under `training`:
+* `dataset.py`: datasets and packing strategies for mosaicml-streaming data.
+* `distributed_attention.py`: sequence parallelism implementation.
+* `modeling_flash_llama.py`: our modified FlashAttention-2 Llama code, with support for variable-length attention, sequence parallelism, memory-efficient cross entropy, and token-averaged losses.
+* `trainer.py`: our trainer derived from Hugging Face's `Trainer` with various improvements.
+* `train_language_model.py`: the main training script.
+
+#### Preparation
+
+1. Download all the data to `datasets/`
+```bash
+git clone https://huggingface.co/datasets/princeton-nlp/prolong-data-64K datasets/long-context-65536
+git clone https://huggingface.co/datasets/princeton-nlp/prolong-data-512K datasets/long-context-524288
+git clone https://huggingface.co/datasets/princeton-nlp/prolong-ultrachat-64K datasets/prolong-ultrachat-64K
+```
+
+2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### Training
+
+We provide the scripts for 64K training (`train_64K.sh`), 512K training (`train_512K.sh`), and the final SFT training (`train_sft.sh`). The scripts require at least 8 GPUs (each with at least 80GB memory) to run. To run it on a local machine, simply do `bash {script_name}.sh`. If you are using SLURM in a cluster environment, you can submit the job by `sbatch {script_name}.sh`. To submit a resume-from-checkpoint job, the same script will work too.
+
+#### Customization
+
+You can read the comments in the scripts to see what customized training arguments we used. 
+Here is a brief explanation of them (we skip all that are already defined in Hugging Face):
+* `--cuda_empty_cache`: empty CUDA cache after each step to avoid OOM.
+* `--config_overrides`: override the default HF config with specified arguments, e.g., `--config_overrides "rope_theta=8000000"`.
+* `--seq_parallel_size`: sequence parallelism size. For example, `--seq_parallel_size 8` means we use 8 GPUs to handle one long sequence.
+* `--apply_instruct_masks`: read the `mask` field from the dataset and mask out those tokens during instruction tuning (e.g., the instructions).
+* `--token_scaled_loss`: average losses over valid training tokens instead of devices. This should be turned on during instruction tuning.
+
+There are more options regarding FSDP, gradient checkpointing, etc. Please refer to the scripts for more details.
 
 ## Contact
 

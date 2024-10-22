@@ -6,6 +6,9 @@
 #SBATCH --mem=400G
 #SBATCH -c 32
 
+# !!!! Load your own environment here !!!! #
+# !!!! Load your own environment here !!!! #
+
 # Fine-tune from this model 
 model=${MODEL:-meta-llama/Meta-Llama-3-8B-Instruct}
 # Point to the base dir of the ProLong 512K data
@@ -30,12 +33,12 @@ domains_name=ProLong512KMix
 
 
 bsz=${BSZ:-128} # * 512K (seq len) / 8 (seq parallel size) = 8M
-seq=${SEQ:-1}
+seq=${SEQ:-1} # per-device batch size
 lr=${LR:-5e-6}
 steps=${STEPS:-2500}
 save_steps=${SAVE:-125}
 warmup=${WARMUP:-0.1}
-suffix=${SUFFIX:-""}
+suffix=${SUFFIX:-""} # for model saving name
 
 
 run_name="lcft_$(basename $model)_$(basename $dataset)_${domains_name}_bsz${bsz}_steps${steps}_lr${lr}_warmup${warmup}${suffix}"
@@ -131,7 +134,6 @@ base_arguments=(
     --warmup_ratio $warmup
     --optim adamw_torch
 
-    --cache_dir .cache
     --logging_steps 1
     --log_level info
 
