@@ -15,8 +15,8 @@ Authors: [Tianyu Gao](https://gaotianyu.xyz/about)\*, [Alexander Wettig](https:/
 
 - [x] ProLong models
 - [x] ProLong data
-- [ ] Pre-training and SFT code
-- [ ] Sequence parallelism
+- [x] Pre-training and SFT code
+- [x] Sequence parallelism
 
 ## Model card
 
