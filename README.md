@@ -112,6 +112,18 @@ Full documentation and installation guide can be found [here](https://docs.mosai
 
 We use our own [datatools](https://github.com/CodeCreator/datatools) (created by Alex and Tianyu) to filter (by lengths) and pack data. `datatools` is a versatile repo that supports tokenization/packing/filtering from various raw formats (json, jsonl, hugging face, mosaicml-streaming, etc) and outputs the data in the mosaicml-streaming format.
 
+Example usage: 
+```bash
+pack <input path> <output path> --pack_length <pack_length> --min_length <discard docs with less tokens> -w <workers>
+
+# For example, pack our raw code data to 64K with 40 workers
+pack data/code_repo data/code_repo-packto64k-minlen64k  --pack_length 65536 --min_length 65536 -w 40
+
+# Our script is also compatible with distributed workflows on SLURM. The example belows uses 20 SLURM array jobs, each using 40 workers
+pack data/code_repo data/code_repo-packto64k-minlen64k  --pack_length 65536 --min_length 65536 -w 40 --num_jobs 20 --slurm_array
+
+```
+
 ## How to train ProLong
 
 <p align="center">
