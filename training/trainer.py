@@ -243,7 +243,7 @@ class TrainingArguments(HfTrainingArguments):
         default=True, metadata={"help": "Use streaming dataset, dataloader, and their ckpt and resume"}
     )
     seq_parallel_size: int = field(
-        default=1, metadata={"help": "Number of sequences to parallelize"}
+        default=1, metadata={"help": "Sequence parallelism group size (1 is no parallelism)"}
     )
 
 
@@ -357,7 +357,12 @@ class Trainer(HFTrainer):
             # What we are doing = sum(sum loss of current seq) / avg #valid tokens per device / #devices / #ga = original * (current device valid seq tokens / avg device valid seq tokens) = original_sumreduction (done in `compute_loss` in modeling_flash_llama.py) / avg device valid seq tokens
             # Technically we should use the avg #valid tokens per device for this batch (may include multiple steps because of gradient accumulation). But for simplicity we use the moving average (from the whole training process)
 
-            device_num_valid_tokens = (inputs["labels"] != -100).sum().float() # Should be on the device already
+            seq_parallel_world_size = (dist.get_world_size(self.seq_parallel_group) if dist.is_initialized() else 1)
+            if seq_parallel_world_size > 1: # Sequence parallelism
+                device_num_valid_tokens = (inputs["shifted_labels"] != -100).sum().float() # Should be on the device already
+            else:
+                device_num_valid_tokens = (inputs["labels"] != -100).sum().float() # Should be on the device already
+
             avg_device_num_valid_tokens = torch.mean(self.accelerator.gather(device_num_valid_tokens)).item()
 
             if not hasattr(self.state, "count_step_for_num_valid_tokens"):
