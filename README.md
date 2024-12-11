@@ -170,6 +170,14 @@ pip install -r requirements.txt
 
 We provide the scripts for 64K training (`train_64K.sh`), 512K training (`train_512K.sh`), and the final SFT training (`train_sft.sh`). The scripts require at least 8 GPUs (each with at least 80GB memory) to run. To run it on a local machine, simply do `bash {script_name}.sh`. If you are using SLURM in a cluster environment, you can submit the job by `sbatch {script_name}.sh`. To submit a resume-from-checkpoint job, the same script will work too.
 
+The 512K training will load the 64K checkpoint and the optimizer state. To allow this, **please do the following**
+```bash
+cd {the HF checkpoint folder of the 64K model}
+mv trainer_state.json trainer_state.json.backup # Otherwise the model will reload the old LR scheduler
+ln -s checkpoint-5000/optimizer.pt . # Link the optimizer state so that it can be loaded; replace checkpoint-5000 to whichever that is the last checkpoint
+```
+
+
 #### Customization
 
 You can read the comments in the scripts to see what customized training arguments we used. 
