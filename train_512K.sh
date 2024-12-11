@@ -113,8 +113,8 @@ base_arguments=(
     --model_name $model
     --tokenizer_name $model
 
-    # Initialize model + optimizer state with ProLong64K
-    --resume_from_checkpoint  path/to/final/64K/checkpoint
+    # Initialize model + optimizer state with ProLong64K (please follow the README for the correct setup)
+    --resume_from_checkpoint  path/to/the/root/64K/checkpoint/folder
     
     --run_name $run_name
     --output_dir $out_dir
