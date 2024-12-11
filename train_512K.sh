@@ -16,10 +16,10 @@ dataset=${DATASET:-"datasets/long-context-524288"}
 
 # Directories in the dataset root folder where @ is followed by the mixing proportion 
 domains=(
-    thestackv1_concat_by_repo2-524288@0.15
-    thestackv1_concat_by_repo2-65536@0.15
-    book2-524288@0.05
-    book2-65536@0.25
+    thestackv1_concat_by_repo-524288@0.15
+    thestackv1_concat_by_repo-65536@0.15
+    book-524288@0.05
+    book-65536@0.25
     fineweb-edu@0.1
     fineweb-2023-50@0.1
     stackexchange@0.04
