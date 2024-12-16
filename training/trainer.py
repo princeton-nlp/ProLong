@@ -370,7 +370,7 @@ class Trainer(HFTrainer):
                 self.state.avg_num_valid_tokens_per_device = avg_device_num_valid_tokens
             else:
                 self.state.count_step_for_num_valid_tokens += 1
-                steps = self.state.count_step_for_num_valid_tokens 
+                steps = self.state.count_step_for_num_valid_tokens
                 self.state.avg_num_valid_tokens_per_device = self.state.avg_num_valid_tokens_per_device * ((steps - 1) / steps) + avg_device_num_valid_tokens / steps # moving avg
 
             loss = loss / self.state.avg_num_valid_tokens_per_device
@@ -939,6 +939,12 @@ class Trainer(HFTrainer):
 
             # First, disable HF's data skip
             self.args.ignore_data_skip = True
+
+            # We save the sample_in_epoch assuming we only train for one epoch, so we need to adjust when resuming multi-epoch training
+            epoch_size = len(self.train_dataset) * self.args.world_size
+            assert dataset_state_dict["sample_in_epoch"] - dataset_state_dict["epoch"] * epoch_size == dataset_state_dict["sample_in_epoch"] % epoch_size
+
+            dataset_state_dict["sample_in_epoch"] = dataset_state_dict["sample_in_epoch"] - dataset_state_dict["epoch"] * epoch_size
 
             # Load the dataset state and reinit the dataloader
             logger.warn(f"Resume streaming dataset state from {checkpoint}: {dataset_state_dict}")
