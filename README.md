@@ -122,6 +122,11 @@ pack data/code_repo data/code_repo-packto64k-minlen64k  --pack_length 65536 --mi
 # Our script is also compatible with distributed workflows on SLURM. The example belows uses 20 SLURM array jobs, each using 40 workers
 pack data/code_repo data/code_repo-packto64k-minlen64k  --pack_length 65536 --min_length 65536 -w 40 --num_jobs 20 --slurm_array
 
+# If you want to tokenize some raw data with text strings into tokenized data (which can then be packed). The example belows uses 20 SLURM array jobs, each using 40 workers.
+# The input directory should also be of mosaic-streaming format. Each item should have a "text" field as raw strings of documents.
+# You should first run at a smaller scale and check if the result looks correct
+tokenize data/code_repo_text data/code_repo -w 40 --num_jobs 20 --slurm_array --tokenizer {HF tokenizer name / llama2 / llama3}
+
 ```
 
 ## How to train ProLong
