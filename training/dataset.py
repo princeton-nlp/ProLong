@@ -129,7 +129,10 @@ def build_dataset(paths, training_args: TrainingArguments, data_args: DataArgume
         else:
             streams.append(SafeStream(remote=path, local=path))
 
-    epoch_size = training_args.world_size * training_args.max_steps * training_args.train_batch_size * training_args.gradient_accumulation_steps
+    epoch_size = (
+        training_args.max_steps * training_args.train_batch_size * training_args.gradient_accumulation_steps *
+        training_args.world_size // training_args.seq_parallel_size
+    )
 
     num_dataloaders = max(training_args.dataloader_num_workers, 1)
     per_device_step_size = training_args.gradient_accumulation_steps * training_args.train_batch_size
